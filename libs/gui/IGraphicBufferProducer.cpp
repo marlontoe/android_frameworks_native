@@ -37,7 +37,6 @@ enum {
     QUEUE_BUFFER,
     CANCEL_BUFFER,
     QUERY,
-    SET_BUFFERS_SIZE,
     CONNECT,
     DISCONNECT,
 };
@@ -181,20 +180,6 @@ public:
         return result;
     }
 
-#ifdef QCOM_HARDWARE
-    virtual status_t setBuffersSize(int size) {
-        Parcel data, reply;
-        data.writeInterfaceToken(IGraphicBufferProducer::getInterfaceDescriptor());
-        data.writeInt32(size);
-        status_t result = remote()->transact(SET_BUFFERS_SIZE, data, &reply);
-        if (result != NO_ERROR) {
-            return result;
-        }
-        result = reply.readInt32();
-        return result;
-    }
-#endif
-
 };
 
 IMPLEMENT_META_INTERFACE(GraphicBufferProducer, "android.gui.IGraphicBufferProducer");
@@ -231,7 +216,7 @@ status_t BnGraphicBufferProducer::onTransact(
             uint32_t h      = data.readInt32();
             uint32_t format = data.readInt32();
             uint32_t usage  = data.readInt32();
-            int buf = 0;
+            int buf;
             sp<Fence> fence;
             int result = dequeueBuffer(&buf, &fence, async, w, h, format, usage);
             reply->writeInt32(buf);
@@ -249,7 +234,6 @@ status_t BnGraphicBufferProducer::onTransact(
             QueueBufferOutput* const output =
                     reinterpret_cast<QueueBufferOutput *>(
                             reply->writeInplace(sizeof(QueueBufferOutput)));
-            memset(output, 0, sizeof(QueueBufferOutput));
             status_t result = queueBuffer(buf, input, output);
             reply->writeInt32(result);
             return NO_ERROR;
@@ -264,22 +248,13 @@ status_t BnGraphicBufferProducer::onTransact(
         } break;
         case QUERY: {
             CHECK_INTERFACE(IGraphicBufferProducer, data, reply);
-            int value = 0;
+            int value;
             int what = data.readInt32();
             int res = query(what, &value);
             reply->writeInt32(value);
             reply->writeInt32(res);
             return NO_ERROR;
         } break;
-#ifdef QCOM_HARDWARE
-        case SET_BUFFERS_SIZE: {
-            CHECK_INTERFACE(IGraphicBufferProducer, data, reply);
-            int size = data.readInt32();
-            status_t res = setBuffersSize(size);
-            reply->writeInt32(res);
-            return NO_ERROR;
-        } break;
-#endif
         case CONNECT: {
             CHECK_INTERFACE(IGraphicBufferProducer, data, reply);
             sp<IBinder> token = data.readStrongBinder();
